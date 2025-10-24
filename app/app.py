@@ -121,6 +121,110 @@ def list_caches() -> List[str]:
         # Log the error
         st.error(f"Error while listing caches: {e}")
         return []
+    
+# ---------------- SharePoint Helpers ----------------
+def get_graph_token() -> str:
+    if not all([TENANT_ID, CLIENT_ID, CLIENT_SECRET]):
+        raise RuntimeError("SharePoint credentials not set in .env.")
+    token_url = f"https://login.microsoftonline.com/{TENANT_ID}/oauth2/v2.0/token"
+    token_data = {
+        "grant_type": "client_credentials",
+        "client_id": CLIENT_ID,
+        "client_secret": CLIENT_SECRET,
+        "scope": "https://graph.microsoft.com/.default"
+    }
+    token_response = requests.post(token_url, data=token_data)
+    token_response.raise_for_status()
+    return token_response.json()["access_token"]
+
+
+def share_link_to_drive_item_meta(share_link: str, access_token: str) -> Dict[str, Any]:
+    encoded_url = base64.urlsafe_b64encode(share_link.strip().encode("utf-8")).decode("utf-8").rstrip("=")
+    meta_url = f"https://graph.microsoft.com/v1.0/shares/u!{encoded_url}/driveItem"
+    meta_res = requests.get(meta_url, headers={"Authorization": f"Bearer {access_token}"})
+    meta_res.raise_for_status()
+    return meta_res.json()
+
+def list_children_for_item(item_id: str, access_token: str) -> List[Dict[str, Any]]:
+    url = f"https://graph.microsoft.com/v1.0/drives/{drive_id_from_item(item_id, access_token)}/items/{item_id}/children"
+    res = requests.get(url, headers={"Authorization": f"Bearer {access_token}"})
+    res.raise_for_status()
+    return res.json().get("value", [])
+
+
+def drive_id_from_item(item_id: str, access_token: str) -> str:
+    # Retrieve driveId for given itemId
+    meta_url = f"https://graph.microsoft.com/v1.0/me/drive/items/{item_id}"
+    url = f"https://graph.microsoft.com/v1.0/drive/items/{item_id}"
+    res = requests.get(url, headers={"Authorization": f"Bearer {access_token}"})
+    res.raise_for_status()
+    parent = res.json().get("parentReference", {})
+    drive_id = parent.get("driveId")
+    if not drive_id:
+        # fallback: root drive
+        drive_id = res.json().get("parentReference", {}).get("driveId", "")
+    return drive_id
+
+
+def collect_files_recursively_from_item(item_json: Dict[str, Any], access_token: str) -> List[Dict[str, Any]]:
+    results = []
+
+    def _walk(item):
+        if "file" in item:
+            results.append({
+                "id": item.get("id"),
+                "name": item.get("name"),
+                "etag": item.get("eTag") or item.get("@microsoft.graph.downloadUrl", "")[:32],
+                "size": item.get("size"),
+                "lastModifiedDateTime": item.get("lastModifiedDateTime"),
+                "downloadUrl": item.get("@microsoft.graph.downloadUrl"),
+            })
+        elif "folder" in item:
+            # fetch children of this folder
+            drive_id = item.get("parentReference", {}).get("driveId")
+            current_id = item.get("id")
+            if not drive_id:
+                drive_id = drive_id_from_item(current_id, access_token)
+            children_url = f"https://graph.microsoft.com/v1.0/drives/{drive_id}/items/{current_id}/children"
+            res = requests.get(children_url, headers={"Authorization": f"Bearer {access_token}"})
+            res.raise_for_status()
+            for child in res.json().get("value", []):
+                _walk(child)
+
+    _walk(item_json)
+    return results
+
+
+def build_manifest(files: List[Dict[str, Any]]) -> Dict[str, Any]:
+    # Map id -> etag for delta detection; also keep readable list
+    return {
+        "files": [
+            {
+                "id": f.get("id"),
+                "name": f.get("name"),
+                "etag": f.get("etag"),
+                "size": f.get("size"),
+                "lastModifiedDateTime": f.get("lastModifiedDateTime"),
+            } for f in files
+        ],
+        "map": {f.get("id"): f.get("etag") for f in files},
+        "count": len(files)
+    }
+
+
+def manifests_equal(a: Dict[str, Any], b: Dict[str, Any]) -> bool:
+    return (a.get("map") == b.get("map")) and (a.get("count") == b.get("count"))
+
+def download_and_extract_text(files: List[Dict[str, Any]]) -> str:
+    all_text = ""
+    for f in files:
+        url = f.get("downloadUrl")
+        if not url:
+            continue
+        fres = requests.get(url)
+        fres.raise_for_status()
+        all_text += get_raw_text(fres.content, f.get("name", "file")) + "\n\n"
+    return all_text
 
 def load_manifest(cache_name: str) -> list:
     try:
@@ -202,6 +306,21 @@ def rebuild_vectorstore_and_save(cache_name: str, raw_text: str):
     except Exception as e:
         st.error(f"Error processing file: {e}")
 
+def load_cache_into_memory(name: str):
+    try:
+        vectorstore = load_vectorstore(OPENAI_API_KEY, PERSIST_DIR, cache_name=name, openai_api_base=OPENAI_API_BASE)
+        if vectorstore:
+            st.session_state.qa, _ = build_qa_engine(
+                raw_text="",
+                openai_api_key=OPENAI_API_KEY,
+                openai_api_base=OPENAI_API_BASE,
+                load_vectorstore_obj=vectorstore
+            )
+            st.session_state.current_cache_name = name
+            return True
+    except Exception as e:
+        st.error(f"Failed to load cache '{name}': {e}")
+    return False
 # ---------------- Settings Tab ----------------
 def page_settings():
     render_header()
