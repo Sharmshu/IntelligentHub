@@ -41,15 +41,6 @@ for k, v in defaults.items():
 # ---------------- Global CSS ----------------
 GLOBAL_CSS = """
 <style>
-# .header-bar {
-#         display: flex;
-#         justify-content: space-between;
-#         align-items: center;
-#         background-color: #0073e6;
-#         padding: 5px 15px;
-#         border-radius: 8px;
-#         margin-bottom: 20px;
-# }
 .header-box {
     background-color: white;
     color: #0073e6;
@@ -73,7 +64,6 @@ st.markdown(GLOBAL_CSS, unsafe_allow_html=True)
 # ---------------- Utility Functions ----------------
 def render_header():
     """ Renders the top header with cache selection and settings access """
-    # st.markdown('<div class="header-bar">', unsafe_allow_html=True)
     st.markdown('<div class="header-box">Intelligent Assistant</div>', unsafe_allow_html=True)
     c1, c2, c3 = st.columns([2, 6, 2])
 
@@ -293,7 +283,7 @@ def load_manifest(cache_name: str) -> list:
 def chat_input():
     """ Input field for chatting """
     # return st.text_input("Ask something...", key="chat_input", placeholder="Type your question here...", label_visibility="collapsed")
-    return st.chat_input("Ask something...")
+    return st.chat_input("Ask something...", , key="chat_input")
 
 # ---------------- Chat Tab ----------------
 def page_chat():
@@ -342,19 +332,46 @@ def page_chat():
     user_query = chat_input()
 
     # Handle user input and chat history
+    # if user_query:
+    #     with st.spinner("Thinking..."):
+    #         try:
+    #             result = st.session_state.qa({"query": user_query})
+    #             st.session_state.chat_history.append({
+    #                 "question": user_query,
+    #                 "answer": result.get("result", ""),
+    #                 "context": result.get("source_documents", [])
+    #             })
+    #         except Exception as e:
+    #             st.error(f"Query error: {e}")
+
+    # Temporary input storage
+    if "user_query_temp" not in st.session_state:
+        st.session_state.user_query_temp = ""
+
+    # Capture input
     if user_query:
-        with st.spinner("Thinking..."):
-            try:
-                result = st.session_state.qa({"query": user_query})
-                st.session_state.chat_history.append({
-                    "question": user_query,
+        st.session_state.user_query_temp = user_query
+        st.experimental_rerun()  # Rerun immediately to process
+
+    # Process input if available
+    if st.session_state.user_query_temp:
+        if st.session_state.qa:
+            with st.spinner("Thinking..."):
+                try:
+                   result = st.session_state.qa({"query": st.session_state.user_query_temp})
+                   st.session_state.chat_history.append({
+                    "question": st.session_state.user_query_temp,
                     "answer": result.get("result", ""),
                     "context": result.get("source_documents", [])
                 })
-            except Exception as e:
-                st.error(f"Query error: {e}")
+                except Exception as e:
+                   st.error(f"Query error: {e}")
+    else:
+        st.warning("Load a Hub first to chat with your document.")
 
-                
+    # Clear temp input after processing
+    st.session_state.user_query_temp = ""
+           
 # ---------------- QA Loader/Builder ----------------
 def rebuild_vectorstore_and_save(cache_name: str, raw_text: str):
     try:
