@@ -283,7 +283,7 @@ def load_manifest(cache_name: str) -> list:
 def chat_input():
     """ Input field for chatting """
     # return st.text_input("Ask something...", key="chat_input", placeholder="Type your question here...", label_visibility="collapsed")
-    return st.chat_input("Ask something...", , key="chat_input")
+    return st.chat_input("Ask something...", key="chat_input")
 
 # ---------------- Chat Tab ----------------
 def page_chat():
