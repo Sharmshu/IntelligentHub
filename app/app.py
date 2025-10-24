@@ -277,10 +277,14 @@ def page_chat():
     # Show chat history
     if st.session_state.chat_history:
         for chat in st.session_state.chat_history:
-            with st.chat_message("user"):
-                st.markdown(chat["question"])
-            with st.chat_message("assistant"):
-                st.markdown(chat["answer"])
+            # User → right
+            with st.chat_message("user" , avatar="https://upload.wikimedia.org/wikipedia/commons/0/04/ChatGPT_logo.svg"):
+                # st.markdown(chat["question"])
+             st.markdown(f"<div style='text-align:right'>{chat['question']}</div>", unsafe_allow_html=True)
+            # Assistant → left
+            with st.chat_message("assistant", avatar="https://upload.wikimedia.org/wikipedia/commons/0/04/ChatGPT_logo.svg"):
+                # st.markdown(chat["answer"])
+            st.markdown(f"<div style='text-align:left'>{chat['answer']}</div>", unsafe_allow_html=True)
     st.markdown('</div>', unsafe_allow_html=True)
                 
 # ---------------- QA Loader/Builder ----------------
