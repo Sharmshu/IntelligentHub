@@ -284,7 +284,7 @@ def page_chat():
             # Assistant → left
             with st.chat_message("assistant", avatar="https://upload.wikimedia.org/wikipedia/commons/0/04/ChatGPT_logo.svg"):
                 # st.markdown(chat["answer"])
-            st.markdown(f"<div style='text-align:left'>{chat['answer']}</div>", unsafe_allow_html=True)
+             st.markdown(f"<div style='text-align:left'>{chat['answer']}</div>", unsafe_allow_html=True)
     st.markdown('</div>', unsafe_allow_html=True)
                 
 # ---------------- QA Loader/Builder ----------------
