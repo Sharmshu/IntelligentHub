@@ -344,24 +344,29 @@ def page_chat():
     #         except Exception as e:
     #             st.error(f"Query error: {e}")
 
-    # Process input if available
-    if user_query:
-        if st.session_state.qa:
-            with st.spinner("Thinking..."):
-                try:
-                   result = st.session_state.qa({"query": user_query})
-                   st.session_state.chat_history.append({
-                    "question": user_query,
-                    "answer": result.get("result", ""),
-                    "context": result.get("source_documents", [])
-                })
-                except Exception as e:
-                   st.error(f"Query error: {e}")
-    else:
-        st.warning("Load a Hub first to chat with your document.")
+    # Initialize pending query
+    if "pending_query" not in st.session_state:
+        st.session_state.pending_query = None
 
-    # Clear temp input after processing
-    st.session_state.user_query_temp = ""
+    # Capture user input
+    if user_query:
+       st.session_state.pending_query = user_query
+
+    # Process pending query only once
+    if st.session_state.pending_query and st.session_state.qa:
+        with st.spinner("Thinking..."):
+            try:
+               result = st.session_state.qa({"query": st.session_state.pending_query})
+               st.session_state.chat_history.append({
+                "question": st.session_state.pending_query,
+                "answer": result.get("result", ""),
+                "context": result.get("source_documents", [])
+            })
+            except Exception as e:
+                st.error(f"Query error: {e}")
+    # Clear pending query so it does not repeat
+    st.session_state.pending_query = None
+
            
 # ---------------- QA Loader/Builder ----------------
 def rebuild_vectorstore_and_save(cache_name: str, raw_text: str):
