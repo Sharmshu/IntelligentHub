@@ -246,6 +246,9 @@ def chat_input():
 def page_chat():
     render_header()
     
+    # Initialize files variable
+    files = []
+    
     # Show current cache info and files (collapsed by default)
     if st.session_state.current_cache_name:
         files = load_manifest(st.session_state.current_cache_name)
