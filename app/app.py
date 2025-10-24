@@ -249,12 +249,26 @@ def page_chat():
     # Show current cache info and files (collapsed by default)
     if st.session_state.current_cache_name:
         files = load_manifest(st.session_state.current_cache_name)
-        with st.expander("📁 Files in Memory", expanded=False):  # collapsed by default
-            if files:
-                for fname in files:
-                    st.markdown(f"- 🗂️ **{fname}**")
-            else:
-                st.info("No files found in this memory.")
+    with st.expander("📁 Files in Memory", expanded=False):
+        if files:
+            for f in files:
+                st.markdown(f"- 🗂️ **{f['name']}**")
+        else:
+            st.info("No files found in this memory.")
+
+                
+    # Show chat history
+    if st.session_state.chat_history:
+        for chat in st.session_state.chat_history:
+            # User → right
+            with st.chat_message("user" , avatar="https://upload.wikimedia.org/wikipedia/commons/0/04/ChatGPT_logo.svg"):
+                # st.markdown(chat["question"])
+             st.markdown(f"<div style='text-align:right'>{chat['question']}</div>", unsafe_allow_html=True)
+            # Assistant → left
+            with st.chat_message("assistant", avatar="https://upload.wikimedia.org/wikipedia/commons/0/04/ChatGPT_logo.svg"):
+                # st.markdown(chat["answer"])
+             st.markdown(f"<div style='text-align:left'>{chat['answer']}</div>", unsafe_allow_html=True)
+    st.markdown('</div>', unsafe_allow_html=True)
                 
     # Chatbox container
     st.markdown('<div class="chatbox">', unsafe_allow_html=True)
@@ -274,18 +288,6 @@ def page_chat():
             except Exception as e:
                 st.error(f"Query error: {e}")
 
-    # Show chat history
-    if st.session_state.chat_history:
-        for chat in st.session_state.chat_history:
-            # User → right
-            with st.chat_message("user" , avatar="https://upload.wikimedia.org/wikipedia/commons/0/04/ChatGPT_logo.svg"):
-                # st.markdown(chat["question"])
-             st.markdown(f"<div style='text-align:right'>{chat['question']}</div>", unsafe_allow_html=True)
-            # Assistant → left
-            with st.chat_message("assistant", avatar="https://upload.wikimedia.org/wikipedia/commons/0/04/ChatGPT_logo.svg"):
-                # st.markdown(chat["answer"])
-             st.markdown(f"<div style='text-align:left'>{chat['answer']}</div>", unsafe_allow_html=True)
-    st.markdown('</div>', unsafe_allow_html=True)
                 
 # ---------------- QA Loader/Builder ----------------
 def rebuild_vectorstore_and_save(cache_name: str, raw_text: str):
