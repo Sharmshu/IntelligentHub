@@ -344,23 +344,14 @@ def page_chat():
     #         except Exception as e:
     #             st.error(f"Query error: {e}")
 
-    # Temporary input storage
-    if "user_query_temp" not in st.session_state:
-        st.session_state.user_query_temp = ""
-
-    # Capture input
-    if user_query:
-        st.session_state.user_query_temp = user_query
-        st.experimental_rerun()  # Rerun immediately to process
-
     # Process input if available
-    if st.session_state.user_query_temp:
+    if user_query:
         if st.session_state.qa:
             with st.spinner("Thinking..."):
                 try:
-                   result = st.session_state.qa({"query": st.session_state.user_query_temp})
+                   result = st.session_state.qa({"query": user_query})
                    st.session_state.chat_history.append({
-                    "question": st.session_state.user_query_temp,
+                    "question": user_query,
                     "answer": result.get("result", ""),
                     "context": result.get("source_documents", [])
                 })
