@@ -211,7 +211,58 @@ def build_manifest(files: List[Dict[str, Any]]) -> Dict[str, Any]:
         "map": {f.get("id"): f.get("etag") for f in files},
         "count": len(files)
     }
+    
+def check_for_sp_updates(cache_name: str) -> bool:
+    """
+    Checks if SharePoint files for this cache are updated.
+    Returns True if an update was detected and data was refreshed.
+    """
+    meta_path = os.path.join(PERSIST_DIR, cache_name, "sp_meta.json")
+    manifest_path = os.path.join(PERSIST_DIR, cache_name, "manifest.json")
 
+    # If this hub was not linked to SharePoint, skip
+    if not os.path.exists(meta_path):
+        return False
+
+    try:
+        with open(meta_path, "r") as f:
+            meta = json.load(f)
+        sp_link = meta.get("sharepoint_link")
+        if not sp_link:
+            return False
+
+        # Get current files list from SharePoint
+        token = get_graph_token()
+        item_json = share_link_to_drive_item_meta(sp_link, token)
+        new_files = collect_files_recursively_from_item(item_json, token)
+        new_manifest = build_manifest(new_files)
+
+        # Load existing manifest
+        if os.path.exists(manifest_path):
+            with open(manifest_path, "r") as f:
+                old_manifest = json.load(f)
+        else:
+            old_manifest = {}
+
+        # Compare manifests
+        if not manifests_equal(old_manifest, new_manifest):
+            # Download updated files
+            text = download_and_extract_text(new_files)
+            rebuild_vectorstore_and_save(cache_name, text)
+
+            # Save updated manifest
+            with open(manifest_path, "w") as f:
+                json.dump(new_manifest, f, indent=2)
+
+            # Update sync status
+            st.session_state.sync_status = (
+                f"🔄 Auto-synced from SharePoint at {time.strftime('%H:%M:%S')}."
+            )
+            return True
+        return False
+    except Exception as e:
+        st.warning(f"Auto-sync check failed: {e}")
+        return False
 
 def manifests_equal(a: Dict[str, Any], b: Dict[str, Any]) -> bool:
     return (a.get("map") == b.get("map")) and (a.get("count") == b.get("count"))
@@ -241,12 +292,17 @@ def load_manifest(cache_name: str) -> list:
     
 def chat_input():
     """ Input field for chatting """
-    return st.text_input("Ask something...", key="chat_input", placeholder="Type your question here...", label_visibility="collapsed")
+    # return st.text_input("Ask something...", key="chat_input", placeholder="Type your question here...", label_visibility="collapsed")
+    return st.chat_input("Ask something...")
 
 # ---------------- Chat Tab ----------------
 def page_chat():
     render_header()
     
+    # Auto-sync check if SharePoint-linked
+    if st.session_state.current_cache_name:
+       check_for_sp_updates(st.session_state.current_cache_name)
+
     # Initialize files variable
     files = []
     
@@ -402,6 +458,10 @@ def page_settings():
                         os.makedirs(os.path.dirname(manifest_path), exist_ok=True)
                     with open(manifest_path, "w") as f:
                         json.dump(manifest, f, indent=2)
+                    meta_path = os.path.join(PERSIST_DIR, cache_name_sp, "sp_meta.json")
+                    with open(meta_path, "w") as f:
+                        json.dump({"sharepoint_link": sp_link}, f, indent=2)
+
                         st.success(f"Loaded SharePoint data as '{cache_name_sp}'.")
                         st.session_state.sync_status = (
                            f"🔄 Memory was refreshed from SharePoint at {time.strftime('%H:%M:%S')}."         
