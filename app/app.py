@@ -329,7 +329,6 @@ def page_chat():
     # Chatbox container
     st.markdown('<div class="chatbox">', unsafe_allow_html=True)
     st.markdown('<h3 style="font-size:20px; font-weight:bold;">Chat with your Document</h3>', unsafe_allow_html=True)
-    user_query = chat_input()
 
     # Handle user input and chat history
     # if user_query:
@@ -344,30 +343,24 @@ def page_chat():
     #         except Exception as e:
     #             st.error(f"Query error: {e}")
 
-    # Initialize pending query
-    if "pending_query" not in st.session_state:
-        st.session_state.pending_query = None
-
     # Capture user input
-    if user_query:
-       st.session_state.pending_query = user_query
+    if st.session_state.qa is None:
+       st.info("Please load a hub or upload a document first to start chatting.")
+    else:
+       user_query = chat_input()
+       if user_query:
+    # Process the query immediately
+            with st.spinner("Thinking..."):
+                try:
+                    result = st.session_state.qa({"query": user_query})
+                    st.session_state.chat_history.append({
+                    "question": user_query,
+                    "answer": result.get("result", ""),
+                    "context": result.get("source_documents", [])
+                })
+                except Exception as e:
+                    st.error(f"Query error: {e}")
 
-    # Process pending query only once
-    if st.session_state.pending_query and st.session_state.qa:
-        with st.spinner("Thinking..."):
-            try:
-               result = st.session_state.qa({"query": st.session_state.pending_query})
-               st.session_state.chat_history.append({
-                "question": st.session_state.pending_query,
-                "answer": result.get("result", ""),
-                "context": result.get("source_documents", [])
-            })
-            except Exception as e:
-                st.error(f"Query error: {e}")
-    # Clear pending query so it does not repeat
-    st.session_state.pending_query = None
-
-           
 # ---------------- QA Loader/Builder ----------------
 def rebuild_vectorstore_and_save(cache_name: str, raw_text: str):
     try:
