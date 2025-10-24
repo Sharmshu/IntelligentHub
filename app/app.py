@@ -311,7 +311,20 @@ def page_chat():
        st.markdown(
         f"<div style='margin-top:10px; color:#0073e6; font-weight:600;'>{st.session_state.sync_status}</div>",
         unsafe_allow_html=True,
-    )      
+    )   
+
+    # Handle user input and chat history
+    if user_query:
+        with st.spinner("Thinking..."):
+            try:
+                result = st.session_state.qa({"query": user_query})
+                st.session_state.chat_history.append({
+                    "question": user_query,
+                    "answer": result.get("result", ""),
+                    "context": result.get("source_documents", [])
+                })
+            except Exception as e:
+                st.error(f"Query error: {e}")   
              
     # Show chat history
     if st.session_state.chat_history:
@@ -330,36 +343,6 @@ def page_chat():
     st.markdown('<div class="chatbox">', unsafe_allow_html=True)
     st.markdown('<h3 style="font-size:20px; font-weight:bold;">Chat with your Document</h3>', unsafe_allow_html=True)
 
-    # Handle user input and chat history
-    # if user_query:
-    #     with st.spinner("Thinking..."):
-    #         try:
-    #             result = st.session_state.qa({"query": user_query})
-    #             st.session_state.chat_history.append({
-    #                 "question": user_query,
-    #                 "answer": result.get("result", ""),
-    #                 "context": result.get("source_documents", [])
-    #             })
-    #         except Exception as e:
-    #             st.error(f"Query error: {e}")
-
-    # Capture user input
-    if st.session_state.qa is None:
-       st.info("Please load a hub or upload a document first to start chatting.")
-    else:
-       user_query = chat_input()
-       if user_query:
-    # Process the query immediately
-            with st.spinner("Thinking..."):
-                try:
-                    result = st.session_state.qa({"query": user_query})
-                    st.session_state.chat_history.append({
-                    "question": user_query,
-                    "answer": result.get("result", ""),
-                    "context": result.get("source_documents", [])
-                })
-                except Exception as e:
-                    st.error(f"Query error: {e}")
 
 # ---------------- QA Loader/Builder ----------------
 def rebuild_vectorstore_and_save(cache_name: str, raw_text: str):
