@@ -31,6 +31,7 @@ defaults = {
     "current_cache_name": None,
     "page": "chat",  # Start with chat
     "authorized_settings": False,
+    "sync_status": "",
 }
 
 for k, v in defaults.items():
@@ -259,7 +260,13 @@ def page_chat():
         else:
             st.info("No files found in this memory.")
 
-                
+    # Show sync status message (if any)
+    if st.session_state.sync_status:
+       st.markdown(
+        f"<div style='margin-top:10px; color:#0073e6; font-weight:600;'>{st.session_state.sync_status}</div>",
+        unsafe_allow_html=True,
+    )      
+             
     # Show chat history
     if st.session_state.chat_history:
         for chat in st.session_state.chat_history:
@@ -326,17 +333,6 @@ def load_cache_into_memory(name: str):
                 load_vectorstore_obj=vectorstore
             )
             st.session_state.current_cache_name = name
-            
-            # ✅ Auto-update manifest if missing or outdated
-            manifest_path = os.path.join(PERSIST_DIR, name, "manifest.json")
-            if not os.path.exists(manifest_path):
-                st.info("Manifest not found. Attempting to rebuild...")
-                # Try to fetch SharePoint link metadata if known (optional)
-                # Or just create a minimal manifest so the Files in Memory section doesn’t break
-                manifest = {"files": [], "map": {}, "count": 0}
-                os.makedirs(os.path.dirname(manifest_path), exist_ok=True)
-                with open(manifest_path, "w") as f:
-                    json.dump(manifest, f, indent=2)
                     
             return True
     except Exception as e:
@@ -407,29 +403,9 @@ def page_settings():
                     with open(manifest_path, "w") as f:
                         json.dump(manifest, f, indent=2)
                         st.success(f"Loaded SharePoint data as '{cache_name_sp}'.")
-                
-                # ✅ Auto-sync feature
-                    if autosync:
-                       st.info("Auto-sync enabled. Checking for updates every 30 seconds...")
-
-                    while autosync:
-                        time.sleep(30)
-                        new_token = get_graph_token()
-                        new_item_json = share_link_to_drive_item_meta(sp_link, new_token)
-                        new_files = collect_files_recursively_from_item(new_item_json, new_token)
-                        new_manifest = build_manifest(new_files)
-
-                        if not manifests_equal(manifest, new_manifest):
-                            st.info("🔄 Changes detected in SharePoint. Updating memory...")
-                            new_text = download_and_extract_text(new_files)
-                            rebuild_vectorstore_and_save(cache_name_sp, new_text)
-                            with open(manifest_path, "w") as f:
-                                json.dump(new_manifest, f, indent=2)
-                            manifest = new_manifest
-                            st.success("Memory auto-updated successfully!")
-                        else:
-                            st.write("✅ No changes detected.") 
-                                  
+                        st.session_state.sync_status = (
+                           f"🔄 Memory was refreshed from SharePoint at {time.strftime('%H:%M:%S')}."         
+                        )
                 except Exception as e:
                         st.error(f"Error loading from SharePoint: {e}")
 
