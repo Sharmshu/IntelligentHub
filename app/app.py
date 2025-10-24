@@ -314,6 +314,7 @@ def page_chat():
     )   
 
     # Handle user input and chat history
+    user_query = chat_input()
     if user_query:
         with st.spinner("Thinking..."):
             try:
